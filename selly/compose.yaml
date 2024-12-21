@@ -1,0 +1,66 @@
+services:
+
+  user_db:
+    container_name: selly-user-db
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - 5433:5432
+    environment:
+      - PGUSER=postgres # this envvar is for postgres command access
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=the_password
+      - POSTGRES_DB=selly_db
+    networks:
+      - internal
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready"] # if PGUSER is not set, cmd tries to log as root, which doesn't exist in db
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+  user_api:
+    build: ./api/user
+    container_name: selly-user-api
+    command: uvicorn app.main:app --proxy-headers --reload --host 0.0.0.0 --port 8000
+    depends_on:
+      user_db:
+        condition: service_healthy
+    restart: always
+    ports:
+      - '8080:8000'
+    volumes:
+      - './api/user/app:/code/app'
+    networks:
+      - internal
+      - api
+      - banky_api
+
+    healthcheck:
+      test: curl --fail user_api:8000 || exit 1
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+    environment:
+      - DB_HOST=user_db
+      - DB_USER=postgres
+      - DB_PASS=the_password
+      - DB_NAME=selly_db
+      - DB_PORT=5432
+
+volumes:
+  postgres_data:
+
+
+networks:
+  api:
+    # Specify driver options
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+  internal:
+    driver: bridge
+  banky_api:
+    external: true

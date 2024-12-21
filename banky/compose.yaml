@@ -1,0 +1,56 @@
+services:
+  db:
+    container_name: banky-db
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    ports:
+      - 5434:5432
+    environment:
+      - PGUSER=postgres # this envvar is for postgres command access
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=the_password
+      - POSTGRES_DB=banky_db
+
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready"] # if PGUSER is not set, cmd tries to log as root, which doesn't exist in db
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+    networks:
+      - internal
+
+
+  api:
+
+    build: ./api
+    container_name: banky-api
+    command: banky
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+    ports:
+      - '8081:8001'
+
+    healthcheck:
+      test: curl --fail api:8001 || exit 1
+      interval: 2s
+      timeout: 2s
+      retries: 5
+
+    networks:
+      - api
+
+volumes:
+  postgres_data:
+
+networks:
+  api:
+    # Specify drive
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+  internal:
+    driver: bridge
