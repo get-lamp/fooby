@@ -1,8 +1,15 @@
-from fastapi import FastAPI
-from app import globals
+from fastapi import FastAPI, APIRouter, status
+from app.routers import user
+
 app = FastAPI()
 
-globals.init(app)
+router = APIRouter()
 
 
-from app import views
+@router.get("/healthcheck", status_code=status.HTTP_204_NO_CONTENT)
+def healthcheck():
+    pass
+
+
+app.include_router(router)
+app.include_router(user.router)
